@@ -75,9 +75,12 @@ def compare_excel_columns(file1_path, file2_path, column_name, output_file="mism
             mismatches_output = mismatches.drop('_merge', axis=1).rename(columns={'normalized_column': 'PROMOTION_CODE'})
             # Add a column to indicate the source file
             mismatches_output['Source'] = mismatches['_merge'].map({'left_only': 'File 1', 'right_only': 'File 2'})
+            # Ensure output directory exists
+            os.makedirs(os.path.dirname(output_file) if os.path.dirname(output_file) else '.', exist_ok=True)
             # Save to Excel
             mismatches_output.to_excel(output_file, index=False, engine='openpyxl')
             print(f"Mismatched rows saved to '{output_file}'.")
+            print(f"Absolute path: {os.path.abspath(output_file)}")
                 
     except FileNotFoundError:
         print("Error: One or both files not found.")
