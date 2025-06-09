@@ -3,6 +3,7 @@ import warnings
 import openpyxl
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
+import os
 
 # Suppress openpyxl style warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
@@ -39,13 +40,22 @@ def compare_excel_columns(file1_path, file2_path, column_name, sheet_name1=0, sh
         df1 = pd.read_excel(file1_path, sheet_name=sheet_name1, engine='openpyxl')
         df2 = pd.read_excel(file2_path, sheet_name=sheet_name2, engine='openpyxl')
         
+        # Normalize column names to lowercase for case-insensitive matching
+        df1.columns = df1.columns.str.lower()
+        df2.columns = df2.columns.str.lower()
+        column_name_lower = column_name.lower()
+        
         # Check if the column exists in both files
-        if column_name not in df1.columns or column_name not in df2.columns:
-            print(f"Error: Column '{column_name}' not found in one or both files.")
+        if column_name_lower not in df1.columns or column_name_lower not in df2.columns:
+            print(f"Error: Column '{column_name}' (case-insensitive) not found in one or both files.")
             return
         
-        # Merge dataframes on the specified column to find mismatches
-        merged = pd.merge(df1, df2, on=column_name, how='outer', indicator=True)
+        # Rename the column to a consistent name for merging
+        df1 = df1.rename(columns={column_name_lower: 'normalized_column'})
+        df2 = df2.rename(columns={column_name_lower: 'normalized_column'})
+        
+        # Merge dataframes on the normalized column to find mismatches
+        merged = pd.merge(df1, df2, on='normalized_column', how='outer', indicator=True)
         
         # Filter rows that are only in one file (mismatches)
         mismatches = merged[merged['_merge'] != 'both']
@@ -57,7 +67,9 @@ def compare_excel_columns(file1_path, file2_path, column_name, sheet_name1=0, sh
             for index, row in mismatches.iterrows():
                 source = 'File 1' if row['_merge'] == 'left_only' else 'File 2'
                 print(f"Row from {source}:")
-                print(row.drop('_merge'))
+                # Rename 'normalized_column' back to original for display
+                row_display = row.drop('_merge').rename({'normalized_column': column_name})
+                print(row_display)
                 print("-" * 50)
                 
     except FileNotFoundError:
@@ -66,7 +78,6 @@ def compare_excel_columns(file1_path, file2_path, column_name, sheet_name1=0, sh
         print(f"An error occurred: {str(e)}")
     finally:
         # Clean up temporary files if created
-        import os
         for temp_file in [file1_path.replace('.xlsx', '_temp.xlsx'), file2_path.replace('.xlsx', '_temp.xlsx')]:
             if os.path.exists(temp_file):
                 os.remove(temp_file)
@@ -75,6 +86,6 @@ def compare_excel_columns(file1_path, file2_path, column_name, sheet_name1=0, sh
 if __name__ == "__main__":
     file1 = "file1.xlsx"  # Replace with your first Excel file path
     file2 = "file2.xlsx"  # Replace with your second Excel file path
-    column_to_compare = "ID"  # Replace with the column name to compare
+    column_to_compare = "PROMOTION_CODE"  # Column name, case-insensitive
     
     compare_excel_columns(file1, file2, column_to_compare)
