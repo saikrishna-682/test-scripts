@@ -30,6 +30,10 @@ def preprocess_excel(file_path):
         print(f"Error preprocessing {file_path}: {str(e)}")
         return file_path
 
+def normalize_column_name(name):
+    """Normalize column name by converting to lowercase and replacing spaces with underscores."""
+    return name.lower().replace(' ', '_')
+
 def compare_excel_columns(file1_path, file2_path, column_name, sheet_name1=0, sheet_name2=0):
     try:
         # Preprocess files to handle style issues
@@ -40,19 +44,23 @@ def compare_excel_columns(file1_path, file2_path, column_name, sheet_name1=0, sh
         df1 = pd.read_excel(file1_path, sheet_name=sheet_name1, engine='openpyxl')
         df2 = pd.read_excel(file2_path, sheet_name=sheet_name2, engine='openpyxl')
         
-        # Normalize column names to lowercase for case-insensitive matching
-        df1.columns = df1.columns.str.lower()
-        df2.columns = df2.columns.str.lower()
-        column_name_lower = column_name.lower()
+        # Normalize column names for case-insensitive and space/underscore matching
+        df1_columns = {normalize_column_name(col): col for col in df1.columns}
+        df2_columns = {normalize_column_name(col): col for col in df2.columns}
+        column_name_normalized = normalize_column_name(column_name)
         
         # Check if the column exists in both files
-        if column_name_lower not in df1.columns or column_name_lower not in df2.columns:
-            print(f"Error: Column '{column_name}' (case-insensitive) not found in one or both files.")
+        if column_name_normalized not in df1_columns or column_name_normalized not in df2_columns:
+            print(f"Error: Column '{column_name}' (case-insensitive, ignoring spaces/underscores) not found in one or both files.")
             return
         
+        # Get the original column names
+        col1 = df1_columns[column_name_normalized]
+        col2 = df2_columns[column_name_normalized]
+        
         # Rename the column to a consistent name for merging
-        df1 = df1.rename(columns={column_name_lower: 'normalized_column'})
-        df2 = df2.rename(columns={column_name_lower: 'normalized_column'})
+        df1 = df1.rename(columns={col1: 'normalized_column'})
+        df2 = df2.rename(columns={col2: 'normalized_column'})
         
         # Merge dataframes on the normalized column to find mismatches
         merged = pd.merge(df1, df2, on='normalized_column', how='outer', indicator=True)
@@ -67,8 +75,8 @@ def compare_excel_columns(file1_path, file2_path, column_name, sheet_name1=0, sh
             for index, row in mismatches.iterrows():
                 source = 'File 1' if row['_merge'] == 'left_only' else 'File 2'
                 print(f"Row from {source}:")
-                # Rename 'normalized_column' back to original for display
-                row_display = row.drop('_merge').rename({'normalized_column': column_name})
+                # Rename 'normalized_column' back to PROMOTION_CODE for display
+                row_display = row.drop('_merge').rename({'normalized_column': 'PROMOTION_CODE'})
                 print(row_display)
                 print("-" * 50)
                 
@@ -86,6 +94,6 @@ def compare_excel_columns(file1_path, file2_path, column_name, sheet_name1=0, sh
 if __name__ == "__main__":
     file1 = "file1.xlsx"  # Replace with your first Excel file path
     file2 = "file2.xlsx"  # Replace with your second Excel file path
-    column_to_compare = "PROMOTION_CODE"  # Column name, case-insensitive
+    column_to_compare = "PROMOTION_CODE"  # Column name, will match 'Promotion Code'
     
     compare_excel_columns(file1, file2, column_to_compare)
