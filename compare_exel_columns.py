@@ -34,7 +34,7 @@ def normalize_column_name(name):
     """Normalize column name by converting to lowercase and replacing spaces with underscores."""
     return name.lower().replace(' ', '_')
 
-def compare_excel_columns(file1_path, file2_path, column_name, sheet_name1=0, sheet_name2=0):
+def compare_excel_columns(file1_path, file2_path, column_name, output_file="mismatches.xlsx", sheet_name1=0, sheet_name2=0):
     try:
         # Preprocess files to handle style issues
         file1_path = preprocess_excel(file1_path)
@@ -71,14 +71,13 @@ def compare_excel_columns(file1_path, file2_path, column_name, sheet_name1=0, sh
         if mismatches.empty:
             print("No mismatches found in the specified column.")
         else:
-            print("Mismatched rows:")
-            for index, row in mismatches.iterrows():
-                source = 'File 1' if row['_merge'] == 'left_only' else 'File 2'
-                print(f"Row from {source}:")
-                # Rename 'normalized_column' back to PROMOTION_CODE for display
-                row_display = row.drop('_merge').rename({'normalized_column': 'PROMOTION_CODE'})
-                print(row_display)
-                print("-" * 50)
+            # Prepare mismatches for saving
+            mismatches_output = mismatches.drop('_merge', axis=1).rename(columns={'normalized_column': 'PROMOTION_CODE'})
+            # Add a column to indicate the source file
+            mismatches_output['Source'] = mismatches['_merge'].map({'left_only': 'File 1', 'right_only': 'File 2'})
+            # Save to Excel
+            mismatches_output.to_excel(output_file, index=False, engine='openpyxl')
+            print(f"Mismatched rows saved to '{output_file}'.")
                 
     except FileNotFoundError:
         print("Error: One or both files not found.")
@@ -95,5 +94,6 @@ if __name__ == "__main__":
     file1 = "file1.xlsx"  # Replace with your first Excel file path
     file2 = "file2.xlsx"  # Replace with your second Excel file path
     column_to_compare = "PROMOTION_CODE"  # Column name, will match 'Promotion Code'
+    output_file = "mismatches.xlsx"  # Output file for mismatches
     
-    compare_excel_columns(file1, file2, column_to_compare)
+    compare_excel_columns(file1, file2, column_to_compare, output_file)
